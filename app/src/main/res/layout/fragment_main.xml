@@ -4,11 +4,35 @@
     android:layout_height="match_parent"
     tools:context=".MainActivity">
 
-    <ListView  xmlns:android="http://schemas.android.com/apk/res/android"
-        xmlns:tools="http://schemas.android.com/tools"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:id="@+id/listview_forecast"
-        android:hapticFeedbackEnabled="true"/>
+    <com.facebook.login.widget.LoginButton
+        android:id="@+id/login_button"
+        android:layout_width="wrap_content"
+        android:layout_height="40dp"
+        android:layout_gravity="center"
+        />
+
+    <TextView
+        android:id="@+id/successMsg"
+        android:text="Login Successful"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        />
+
+    <TextView
+        android:id="@+id/errorMsg"
+        android:text="Login Failed"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        />
+
+    <TextView
+        android:id="@+id/cancelMsg"
+        android:text="Login Cancelled"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:visibility="gone"
+        />
 
 </FrameLayout>
