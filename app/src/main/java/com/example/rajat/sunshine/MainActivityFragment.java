@@ -1,22 +1,15 @@
 package com.example.rajat.sunshine;
 
 import android.app.Activity;
-import android.content.Context;
 import android.content.Intent;
-import android.support.v4.app.Fragment;
 import android.os.Bundle;
+import android.support.v4.app.Fragment;
 import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
-import android.widget.ListView;
-
-import java.io.IOException;
-import java.net.HttpURLConnection;
-import java.net.URL;
-import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.List;
+import android.widget.Button;
+import android.widget.TextView;
 
 import com.facebook.AccessToken;
 import com.facebook.AccessTokenTracker;
@@ -24,12 +17,11 @@ import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
 import com.facebook.FacebookSdk;
-import com.facebook.GraphRequest;
-import com.facebook.GraphResponse;
+import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
-import com.facebook.login.widget.LoginButton;
 
-import org.json.JSONObject;
+import java.util.Arrays;
+import java.util.List;
 
 /**
  * A placeholder fragment containing a simple view.
@@ -37,11 +29,19 @@ import org.json.JSONObject;
 public class MainActivityFragment extends Fragment {
 
     private static final String TAG="MainActivityFragment";
-    private static final String OPEN_WEATHER_MAP_APP_ID = "fdc95bb294937095a6b1a93e502c0da3";
     CallbackManager callbackManager;
     AccessToken accessToken;
     AccessTokenTracker accessTokenTracker;
+    LoginManager loginManager;
+    FBLoginResultListener mListener;
+    Fragment mCurrentFragment;
 
+
+    public interface FBLoginResultListener {
+        public void onFBLoginSuccess();
+
+        public void onFBLoginFailure();
+    }
 
     public MainActivityFragment() {
     }
@@ -51,6 +51,9 @@ public class MainActivityFragment extends Fragment {
         super.onCreate(savedInstanceState);
         FacebookSdk.sdkInitialize(getActivity().getApplicationContext());
         callbackManager = CallbackManager.Factory.create();
+        loginManager = LoginManager.getInstance();
+
+        mCurrentFragment = this;
 
         /*accessTokenTracker = new AccessTokenTracker() {
             @Override
@@ -65,69 +68,113 @@ public class MainActivityFragment extends Fragment {
         accessToken = AccessToken.getCurrentAccessToken();*/
     }
 
+
     @Override
     public View onCreateView(LayoutInflater inflater, ViewGroup container,
                              Bundle savedInstanceState) {
 
         View view = inflater.inflate(R.layout.fragment_main, container, false);
 
-        LoginButton loginButton;
-        loginButton = (LoginButton) view.findViewById(R.id.login_button);
-        List<String> fbPermissions = Arrays.asList("user_photos", "user_videos");
+        final Button loginButton;
+        loginButton = (Button) view.findViewById(R.id.login_button);
 
-        loginButton.setReadPermissions(fbPermissions);
+        accessToken = AccessToken.getCurrentAccessToken();
+        if (accessToken == null) {
+            Log.d(TAG, "AccessToken Null");
+            loginButton.setText("Login");
+        } else {
+            Log.d(TAG, "AccessToken not Null. Already logged in" + accessToken.toString());
+            loginButton.setText("Logout");
+        }
 
-        // If using in a fragment
-        loginButton.setFragment(this);
-        // Other app specific specialization
+        loginButton.setOnClickListener(loginClickListener);
 
         // Callback registration
-        loginButton.registerCallback(callbackManager, new FacebookCallback<LoginResult>() {
-            @Override
-            public void onSuccess(LoginResult loginResult) {
-                // App code
-                accessToken = AccessToken.getCurrentAccessToken();
-                Log.e(TAG,"Facebook login successful " + accessToken);
-/*
-                View loginBtn = getActivity().findViewById(R.id.login_button);
-                loginBtn.setVisibility(View.GONE);
-*/
-                View successMsg = getActivity().findViewById(R.id.successMsg);
-                successMsg.setVisibility(View.VISIBLE);
-            }
-
-            @Override
-            public void onCancel() {
-                // App code
-                Log.e(TAG,"Facebook login cancelled");
-                View loginBtn = getActivity().findViewById(R.id.login_button);
-                loginBtn.setVisibility(View.GONE);
-                View cancelMsg = getActivity().findViewById(R.id.cancelMsg);
-                cancelMsg.setVisibility(View.VISIBLE);
-            }
-
-            @Override
-            public void onError(FacebookException exception) {
-                // App code
-                Log.e(TAG,"Error in Facebook login");
-                View loginBtn = getActivity().findViewById(R.id.login_button);
-                loginBtn.setVisibility(View.GONE);
-                View errorMsg = getActivity().findViewById(R.id.errorMsg);
-                errorMsg.setVisibility(View.VISIBLE);
-            }
-        });
+        loginManager.registerCallback(callbackManager, loginResultFacebookCallback);
 
         return view;
     }
+
+    View.OnClickListener loginClickListener = new View.OnClickListener() {
+        @Override
+        public void onClick(View view) {
+            List<String> fbPermissions = Arrays.asList("user_photos", "user_videos");
+            if (((Button) view).getText() == "Login") {
+                Log.d(TAG, "Initiating Login");
+                loginManager.logInWithReadPermissions(mCurrentFragment, fbPermissions);
+            } else {
+                Log.d(TAG, "Initiating Logout");
+                loginManager.logOut();
+            }
+        }
+    };
+
+
+    FacebookCallback<LoginResult> loginResultFacebookCallback = new FacebookCallback<LoginResult>() {
+        @Override
+        public void onSuccess(LoginResult loginResult) {
+            // App code
+            accessToken = AccessToken.getCurrentAccessToken();
+            Log.e(TAG, "Facebook login successful " + accessToken);
+            TextView successMsg = (TextView) getActivity().findViewById(R.id.resultMsg);
+            AccessToken accessToken = AccessToken.getCurrentAccessToken();
+            Log.d(TAG, "Permissions: " + accessToken.getPermissions().toString());
+            successMsg.setText("Login Successful" + accessToken.getPermissions().toString());
+            successMsg.setVisibility(View.VISIBLE);
+
+            mListener.onFBLoginSuccess();
+
+/*
+
+            ImageListFragment imageListFragment;
+            imageListFragment = new ImageListFragment();
+
+            FragmentTransaction ft = getFragmentManager().beginTransaction();
+            ft.replace(R.id.fragment_container, ((Fragment) imageListFragment));
+            ft.commit();
+*/
+
+        }
+
+        @Override
+        public void onCancel() {
+            // App code
+            Log.e(TAG, "Facebook login cancelled");
+
+            TextView cancelMsg = (TextView) getActivity().findViewById(R.id.resultMsg);
+            cancelMsg.setText("Login Cancelled");
+            cancelMsg.setVisibility(View.VISIBLE);
+
+            mListener.onFBLoginFailure();
+        }
+
+        @Override
+        public void onError(FacebookException exception) {
+            // App code
+            Log.e(TAG, "Error in Facebook login");
+            TextView errorMsg = (TextView) getActivity().findViewById(R.id.resultMsg);
+            errorMsg.setText("Login Error" + exception.toString());
+            errorMsg.setVisibility(View.VISIBLE);
+
+            mListener.onFBLoginFailure();
+        }
+    };
 
     @Override
     public void onActivityCreated(Bundle savedInstanceState) {
         super.onActivityCreated(savedInstanceState);
      }
 
+
     @Override
     public void onAttach(Activity activity) {
         super.onAttach(activity);
+
+        try {
+            mListener = (FBLoginResultListener) activity;
+        } catch (ClassCastException e) {
+            throw new ClassCastException(activity.toString() + "must implement FBLoginResultListener");
+        }
 
     }
 
