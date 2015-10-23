@@ -1,17 +1,14 @@
 package com.example.rajat.sunshine;
 
 import android.os.Bundle;
+import android.support.v4.app.FragmentTransaction;
 import android.support.v7.app.ActionBarActivity;
 import android.util.Log;
 import android.view.Menu;
 import android.view.MenuItem;
 
-import com.facebook.AccessToken;
-import com.facebook.GraphRequest;
-import com.facebook.GraphResponse;
+import com.facebook.FacebookSdk;
 import com.facebook.appevents.AppEventsLogger;
-
-import org.json.JSONObject;
 
 
 public class MainActivity extends ActionBarActivity implements
@@ -24,9 +21,12 @@ public class MainActivity extends ActionBarActivity implements
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
+        FacebookSdk.sdkInitialize(getApplicationContext());
+
         MainActivityFragment listFragment = new MainActivityFragment();
 
-        getSupportFragmentManager().beginTransaction().add(R.id.fragment_container, listFragment).commit();
+        getSupportFragmentManager().beginTransaction().
+                add(R.id.fragment_container, listFragment, "FBLoginFragment").commit();
 
     }
 
@@ -65,25 +65,27 @@ public class MainActivity extends ActionBarActivity implements
     }
 
     @Override
-    public void onFBLoginSuccess() {
-        AccessToken accessToken;
-        accessToken = AccessToken.getCurrentAccessToken();
+    public void onFBLoginSuccess(String option) {
 
-        Log.d(TAG, "Making Graph Request");
-        GraphRequest request = GraphRequest.newMeRequest(
-                accessToken,
-                new GraphRequest.GraphJSONObjectCallback() {
-                    @Override
-                    public void onCompleted(
-                            JSONObject object,
-                            GraphResponse response) {
-                        // Application code
-                        Log.d(TAG, "Graph Response " + response.toString());
-                    }
-                });
-        Bundle parameters = new Bundle();
-        parameters.putString("fields", "id,name,link");
-        request.setParameters(parameters);
-        request.executeAsync();
+        Log.i(TAG, "Options received " + option);
+
+        ImageListFragment imageListFragment = (ImageListFragment) getSupportFragmentManager().
+                findFragmentByTag("FBImageList");
+
+        if (imageListFragment != null) {
+            imageListFragment.fbOptionSelected(option);
+        } else {
+            ImageListFragment newFragment = new ImageListFragment();
+            Bundle args = new Bundle();
+            args.putString(newFragment.SELECTED_OPTION, option);
+            newFragment.setArguments(args);
+
+            FragmentTransaction ft = getSupportFragmentManager().beginTransaction();
+            ft.replace(R.id.fragment_container, newFragment);
+            ft.addToBackStack(null);
+            ft.commit();
+        }
+
+
     }
 }

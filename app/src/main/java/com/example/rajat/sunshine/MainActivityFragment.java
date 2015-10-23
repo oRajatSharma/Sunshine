@@ -8,7 +8,9 @@ import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
+import android.widget.AdapterView;
 import android.widget.Button;
+import android.widget.ListView;
 import android.widget.TextView;
 
 import com.facebook.AccessToken;
@@ -16,7 +18,6 @@ import com.facebook.AccessTokenTracker;
 import com.facebook.CallbackManager;
 import com.facebook.FacebookCallback;
 import com.facebook.FacebookException;
-import com.facebook.FacebookSdk;
 import com.facebook.login.LoginManager;
 import com.facebook.login.LoginResult;
 
@@ -35,12 +36,14 @@ public class MainActivityFragment extends Fragment {
     LoginManager loginManager;
     FBLoginResultListener mListener;
     Fragment mCurrentFragment;
-
+    ListView mFBOptions;
+    TextView mSuccessMsg;
+    Button loginButton;
 
     public interface FBLoginResultListener {
-        public void onFBLoginSuccess();
+        void onFBLoginSuccess(String option);
 
-        public void onFBLoginFailure();
+        void onFBLoginFailure();
     }
 
     public MainActivityFragment() {
@@ -49,23 +52,23 @@ public class MainActivityFragment extends Fragment {
     @Override
     public void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
-        FacebookSdk.sdkInitialize(getActivity().getApplicationContext());
+
         callbackManager = CallbackManager.Factory.create();
         loginManager = LoginManager.getInstance();
 
         mCurrentFragment = this;
 
-        /*accessTokenTracker = new AccessTokenTracker() {
+        accessTokenTracker = new AccessTokenTracker() {
             @Override
             protected void onCurrentAccessTokenChanged(
                     AccessToken oldAccessToken,
                     AccessToken currentAccessToken) {
                 // Set the access token using
                 // currentAccessToken when it's loaded or set.
+                Log.i(TAG, "Access Token Changed");
+                accessToken = AccessToken.getCurrentAccessToken();
             }
         };
-        // If the access token is available already assign it.
-        accessToken = AccessToken.getCurrentAccessToken();*/
     }
 
 
@@ -75,22 +78,40 @@ public class MainActivityFragment extends Fragment {
 
         View view = inflater.inflate(R.layout.fragment_main, container, false);
 
-        final Button loginButton;
         loginButton = (Button) view.findViewById(R.id.login_button);
+        mFBOptions = (ListView) view.findViewById(R.id.FBOptions);
+        mSuccessMsg = (TextView) view.findViewById(R.id.resultMsg);
 
         accessToken = AccessToken.getCurrentAccessToken();
-        if (accessToken == null) {
-            Log.d(TAG, "AccessToken Null");
+        if (accessToken == null || accessToken.isExpired()) {
+            Log.i(TAG, "AccessToken Null");
             loginButton.setText("Login");
+            mSuccessMsg.setVisibility(View.GONE);
+            mFBOptions.setVisibility(View.GONE);
         } else {
-            Log.d(TAG, "AccessToken not Null. Already logged in" + accessToken.toString());
+            Log.i(TAG, "AccessToken not Null. Already logged in" + accessToken.toString());
+            Log.i(TAG, "Access Token expiry " + accessToken.getExpires());
             loginButton.setText("Logout");
+            mSuccessMsg.setVisibility(View.VISIBLE);
+            mFBOptions.setVisibility(View.VISIBLE);
         }
 
         loginButton.setOnClickListener(loginClickListener);
 
         // Callback registration
         loginManager.registerCallback(callbackManager, loginResultFacebookCallback);
+
+        mFBOptions.setOnItemClickListener(new AdapterView.OnItemClickListener() {
+            @Override
+            public void onItemClick(AdapterView<?> mFBOptions, View view, int position, long rowId) {
+                Log.i(TAG, "Item clicked position = " + position + " rowId = " + rowId);
+                TextView textView = (TextView) view;
+                String clickedText = textView.getText().toString();
+
+                Log.i(TAG, "Clicked Item : " + clickedText);
+                mListener.onFBLoginSuccess(clickedText);
+            }
+        });
 
         return view;
     }
@@ -100,11 +121,14 @@ public class MainActivityFragment extends Fragment {
         public void onClick(View view) {
             List<String> fbPermissions = Arrays.asList("user_photos", "user_videos");
             if (((Button) view).getText() == "Login") {
-                Log.d(TAG, "Initiating Login");
+                Log.i(TAG, "Initiating Login");
                 loginManager.logInWithReadPermissions(mCurrentFragment, fbPermissions);
             } else {
-                Log.d(TAG, "Initiating Logout");
+                Log.i(TAG, "Initiating Logout");
                 loginManager.logOut();
+                mFBOptions.setVisibility(View.GONE);
+                mSuccessMsg.setVisibility(View.GONE);
+                ((Button) view).setText("Login");
             }
         }
     };
@@ -116,23 +140,15 @@ public class MainActivityFragment extends Fragment {
             // App code
             accessToken = AccessToken.getCurrentAccessToken();
             Log.e(TAG, "Facebook login successful " + accessToken);
-            TextView successMsg = (TextView) getActivity().findViewById(R.id.resultMsg);
             AccessToken accessToken = AccessToken.getCurrentAccessToken();
-            Log.d(TAG, "Permissions: " + accessToken.getPermissions().toString());
-            successMsg.setText("Login Successful" + accessToken.getPermissions().toString());
-            successMsg.setVisibility(View.VISIBLE);
+            Log.i(TAG, "Permissions: " + accessToken.getPermissions().toString());
+            mSuccessMsg.setText("Login Successful" + accessToken.getPermissions().toString());
+            Log.i(TAG, "Access Token expiry " + accessToken.getExpires());
 
-            mListener.onFBLoginSuccess();
+            loginButton.setText("Logout");
+            mSuccessMsg.setVisibility(View.VISIBLE);
+            mFBOptions.setVisibility(View.VISIBLE);
 
-/*
-
-            ImageListFragment imageListFragment;
-            imageListFragment = new ImageListFragment();
-
-            FragmentTransaction ft = getFragmentManager().beginTransaction();
-            ft.replace(R.id.fragment_container, ((Fragment) imageListFragment));
-            ft.commit();
-*/
 
         }
 
@@ -141,22 +157,20 @@ public class MainActivityFragment extends Fragment {
             // App code
             Log.e(TAG, "Facebook login cancelled");
 
-            TextView cancelMsg = (TextView) getActivity().findViewById(R.id.resultMsg);
-            cancelMsg.setText("Login Cancelled");
-            cancelMsg.setVisibility(View.VISIBLE);
+            mSuccessMsg.setText("Login Cancelled");
+            mSuccessMsg.setVisibility(View.VISIBLE);
 
-            mListener.onFBLoginFailure();
+//            mListener.onFBLoginFailure();
         }
 
         @Override
         public void onError(FacebookException exception) {
             // App code
             Log.e(TAG, "Error in Facebook login");
-            TextView errorMsg = (TextView) getActivity().findViewById(R.id.resultMsg);
-            errorMsg.setText("Login Error" + exception.toString());
-            errorMsg.setVisibility(View.VISIBLE);
+            mSuccessMsg.setText("Login Error" + exception.toString());
+            mSuccessMsg.setVisibility(View.VISIBLE);
 
-            mListener.onFBLoginFailure();
+//            mListener.onFBLoginFailure();
         }
     };
 
@@ -175,7 +189,12 @@ public class MainActivityFragment extends Fragment {
         } catch (ClassCastException e) {
             throw new ClassCastException(activity.toString() + "must implement FBLoginResultListener");
         }
+    }
 
+    @Override
+    public void onDetach() {
+        super.onDetach();
+        mListener = null;
     }
 
     @Override
@@ -193,6 +212,6 @@ public class MainActivityFragment extends Fragment {
     @Override
     public void onDestroy() {
         super.onDestroy();
-//        accessTokenTracker.stopTracking();
+        accessTokenTracker.stopTracking();
     }
 }

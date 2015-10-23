@@ -8,4 +8,10 @@
 <!-- TODO: Remove or change this placeholder text -->
     <string name="hello_blank_fragment">Hello blank fragment</string>
 
+    <string-array name="FBOptions">
+        <item>Uploaded Images</item>
+        <item>Your Images</item>
+        <item>Videos</item>
+    </string-array>
+
 </resources>
